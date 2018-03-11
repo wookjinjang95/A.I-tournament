@@ -5,7 +5,6 @@ result, please follow the command below.
 
   python capture.py -r baselineTeam -b myTeam
   
-  
 If you run the code above, you will be able to see red team and blue team. Blue team is the A.I pacman that I created and
 redTeam is the baseline A.I that I have to go against.
 
@@ -29,7 +28,7 @@ redTeam is the baseline A.I that I have to go against.
   #### game.py
   The logic behind how the Pacman world works. This file describes several supporting types like AgentState, Agent, Direction, and Grid.
   
-  #### util.py:
+  #### util.py
   Useful data structures for implementing search algorithms.
 
   #### distanceCalculator.py
