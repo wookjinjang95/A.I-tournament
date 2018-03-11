@@ -29,7 +29,7 @@ redTeam is the baseline A.I that I have to go against.
   #### game.py
   The logic behind how the Pacman world works. This file describes several supporting types like AgentState, Agent, Direction, and Grid.
   
-  #### util.py
+  #### util.py:
   Useful data structures for implementing search algorithms.
 
   #### distanceCalculator.py
