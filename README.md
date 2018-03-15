@@ -5,7 +5,6 @@ result, please follow the command below.
 
   python capture.py -r baselineTeam -b myTeam
   
-  
 If you run the code above, you will be able to see red team and blue team. Blue team is the A.I pacman that I created and
 redTeam is the baseline A.I that I have to go against.
 
