@@ -68,6 +68,13 @@ class DummyAgent(CaptureAgent):
     '''
     CaptureAgent.registerInitialState(self, gameState)
 
+    currentFood = self.getFood(gameState).asList()
+    value = 0
+    for food in currentFood:
+      value += food[1]
+    average = value/len(currentFood)
+    self.average = average
+
     '''
     Your initialization code goes here, if you need any.
     '''
@@ -95,6 +102,12 @@ class DummyAgent(CaptureAgent):
         maxIndex = qValuesList.index(maxValue)
         bestAction = actionList[maxIndex]
     #print ("Best Action:", bestAction)
+    opponents = self.getOpponents(gameState)
+    '''
+    for opponent in opponents:
+      enemyPosition = successorState.getAgentState(opponent).getPosition()
+      print enemyPosition
+    '''
     return bestAction
 
   def evaluate(self, currentState, successorState, action):
@@ -107,8 +120,9 @@ class DummyAgent(CaptureAgent):
     features = self.getFeatures(currentState, successorState, action)
     weights = self.getWeights(currentState, action)
     qVal += features['closestFood'] * weights['closestFood']
-    #qVal += features['closestCapsule'] * weights['closestCapsule']
-    #qVal += features['enemyDistance'] * weights['enemyDistance']
+    qVal += features['closestCapsule'] * weights['closestCapsule']
+    qVal += features['enemyDistance'] * weights['enemyDistance']
+    qVal += features['trapped'] * weights['trapped']
     return qVal
 
 
@@ -122,11 +136,10 @@ class DummyAgent(CaptureAgent):
     # EX) Food is a distance closest to 1. Either find a value for it
     # or check if the action taken gets you closer to the closest food?
     features = util.Counter()
-    #features['successorScore'] = self.getScore(successor)
-    features['closestFood'] = self.getClosestFood(currentState, successorState)
-    #features['closestEnemy'] = self.getApproximateEnemy(currentState)
+    features['closestFood'] = self.getClosestFood(currentState, successorState, self.average)
     features['closestCapsule'] = self.getClosestCapsule(currentState, successorState)
-    features['enemyDistance'] = self.getEnemyDistance(currentState, successorState, action)
+    features['enemyDistance'] = self.stayAway(currentState, successorState)
+    features['trapped'] = self.calculateTrapped(successorState, currentState, action)
     return features
 
   def getWeights(self, gameState, action):
@@ -134,7 +147,7 @@ class DummyAgent(CaptureAgent):
     Returns a dict of values that deem how important a charateristic is.
     """
     # Holds a dict of weights for features. Change these to reflect importance.
-    return {'closestFood': 2.0, 'closestCapsule': 1.0, 'enemyDistance': -1.0}
+    return {'closestFood': 1.0, 'closestCapsule': 1.0, 'enemyDistance': -2.0, 'trapped': -2.0}
 
   ####################
   # HELPER FUNCTIONS #
@@ -147,7 +160,7 @@ class DummyAgent(CaptureAgent):
   3) Get Capusle - While invulnerable, eat as much food as can
             while always moving towards noise (chase opponent if found)
   """
-  def getClosestFood(self, currentState, successorState):
+  def getClosestFood(self, currentState, successorState, average):
     # CHANGE NUMBERS TO FIT INTO THE FITNESS SECTION
     totalEval = 0
     curState = currentState.getAgentState(self.index)
@@ -155,6 +168,19 @@ class DummyAgent(CaptureAgent):
     succState = successorState.getAgentState(self.index)
     newPos = succState.getPosition()
     currentFood = self.getFood(currentState).asList()
+
+    tempFood = []
+    for food in currentFood:
+      if self.index < 2:
+        if food[1] >= average:
+          tempFood.append(food)
+      else:
+        if food[1] < average:
+          tempFood.append(food)
+
+    if len(tempFood) > 0:
+      currentFood = tempFood
+
     # If Pacman can get food in its next state increase priority
     for food in currentFood:
       if newPos == food:
@@ -242,6 +268,38 @@ class DummyAgent(CaptureAgent):
             return float("-inf")
     return distance_away_from_enemy
 
+
+  def stayAway(self, currentState, successorState):
+    currentPos = currentState.getAgentState(self.index).getPosition()
+    newPos = successorState.getAgentState(self.index).getPosition()
+    enemyPositions = self.newEnemyDistance(currentState, successorState)
+    opponents = self.getOpponents(currentState)
+    if len(enemyPositions) == 0:
+      return 0
+    else:
+      for opponent in opponents:
+        if not currentState.getAgentState(opponent).isPacman:
+          if currentState.getAgentState(opponent).scaredTimer > 0:
+            return 0
+      if currentState.getAgentState(self.index).isPacman:
+        for enemy in enemyPositions:
+          if self.getMazeDistance(currentPos, enemy) < 6:
+            factor = 1.0 - float(self.getMazeDistance(currentPos, enemy))/75.0
+            return factor
+          #if abs(self.getMazeDistance(newPos, enemy) - self.getMazeDistance(currentPos, enemy)) < 3:
+            #return self.getMazeDistance(newPos, enemy)
+    #print("How did I get here?")
+    return 0
+
+  def newEnemyDistance(self, currentState, successorState):
+    opponents = self.getOpponents(currentState)
+    enemyPositions = []
+    for opponent in opponents:
+      enemyPosition = successorState.getAgentState(opponent).getPosition()
+      if enemyPosition is not None:
+        enemyPositions.append(enemyPosition)
+    return enemyPositions
+
   def calculateTrapped(self, successorState, currentState, action):
       """
             To know whether you are going to be trapped or not,
@@ -251,7 +309,15 @@ class DummyAgent(CaptureAgent):
             However, this doesnt calculate if the trapped space is
             bigger, not just one spot.
       """
-      return self.goThroughSuccessorForTrap(successorState, action, count=5)
+      trapped = self.goThroughSuccessorForTrap(successorState, action, count=5)
+      if trapped == True:
+        enemyPositions = self.newEnemyDistance(currentState, successorState)
+        opponents = self.getOpponents(currentState)
+        currentPos = currentState.getAgentState(self.index).getPosition()
+        for enemy in enemyPositions:
+          if self.getMazeDistance(currentPos, enemy) < 6:
+            return 10
+      return 0
 
   def goThroughSuccessorForTrap(self, successorState, prevAction, count):
       """
@@ -303,6 +369,7 @@ class DummyAgent(CaptureAgent):
           if len(actions) == 0:
               position = successorState.getAgentState(self.index).getPosition()
               #print "trapped place found!", self.index, position
+              #print "trapped found near 5 distance"
               return True
           elif len(actions) == 1:
               next_successor_state = successorState.generateSuccessor(self.index, actions[0])
